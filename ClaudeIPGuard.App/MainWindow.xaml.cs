@@ -1,4 +1,5 @@
 using System.IO;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
@@ -11,15 +12,17 @@ public partial class MainWindow : Window
 {
     private readonly bool _startMinimized;
     private readonly MainViewModel _viewModel;
+    private bool _allowExit;
 
     public MainWindow(bool startMinimized)
     {
         InitializeComponent();
         Icon = LoadImage(AppLogoPaths.Safe);
         _startMinimized = startMinimized;
-        _viewModel = new MainViewModel(BringToFront, ShowDangerDialog, () => Tabs.SelectedIndex = 1);
+        _viewModel = new MainViewModel(BringToFront, ShowDangerDialog, () => Tabs.SelectedIndex = 1, ExitFromTray);
         DataContext = _viewModel;
         Loaded += OnLoaded;
+        Closing += OnClosing;
         Closed += (_, _) => _viewModel.Dispose();
     }
 
@@ -45,6 +48,30 @@ public partial class MainWindow : Window
         Topmost = true;
         Topmost = false;
         Focus();
+    }
+
+    private void OnClosing(object? sender, CancelEventArgs e)
+    {
+        if (_allowExit)
+        {
+            return;
+        }
+
+        e.Cancel = true;
+        WindowState = WindowState.Minimized;
+        Hide();
+    }
+
+    private void ExitFromTray()
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(ExitFromTray);
+            return;
+        }
+
+        _allowExit = true;
+        Close();
     }
 
     private void ShowDangerDialog(DangerWarning warning)

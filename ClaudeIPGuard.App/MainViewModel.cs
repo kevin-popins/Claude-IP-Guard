@@ -30,6 +30,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private readonly Action _bringToFront;
     private readonly Action<DangerWarning> _showWarning;
     private readonly Action _showSettings;
+    private readonly Action _exitApplication;
 
     private GuardSettings _settings;
     private TrayService? _tray;
@@ -74,11 +75,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private bool _settingsNotifications;
     private bool _settingsBringToFront;
 
-    public MainViewModel(Action bringToFront, Action<DangerWarning> showWarning, Action showSettings)
+    public MainViewModel(Action bringToFront, Action<DangerWarning> showWarning, Action showSettings, Action exitApplication)
     {
         _bringToFront = bringToFront;
         _showWarning = showWarning;
         _showSettings = showSettings;
+        _exitApplication = exitApplication;
         _settings = _settingsStore.Load();
         _firewall = new FirewallService(_log);
         _diagnostics = new DiagnosticReportService(_log);
@@ -179,7 +181,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             () => _ = RecheckAndUnblockAsync(),
             () => _showSettings(),
             OpenLogs,
-            () => System.Windows.Application.Current.Shutdown());
+            _exitApplication);
 
         NetworkChange.NetworkAddressChanged += OnNetworkChanged;
 

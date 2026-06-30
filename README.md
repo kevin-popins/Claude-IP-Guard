@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 1.0" src="https://img.shields.io/badge/version-1.0.0-brightgreen?style=for-the-badge">
+  <img alt="Version 1.0.1" src="https://img.shields.io/badge/version-1.0.1-brightgreen?style=for-the-badge">
   <img alt="Windows" src="https://img.shields.io/badge/Windows-WPF-0078D4?style=for-the-badge&logo=windows">
   <img alt=".NET 8" src="https://img.shields.io/badge/.NET-8.0-512BD4?style=for-the-badge&logo=dotnet">
   <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge">
@@ -38,6 +38,8 @@ Claude IP Guard нужен для простой вещи: не дать Claude 
 - пишет локальные логи и экспортирует диагностический отчет;
 - работает из tray и может запускаться вместе с Windows.
 
+Окно можно свернуть обычной кнопкой minimize. Кнопка `X` не выключает защиту: она прячет окно в tray, а приложение продолжает следить за сетью. Полностью закрыть Claude IP Guard можно только через tray menu -> `Exit`.
+
 Чего приложение не делает:
 
 - не читает трафик Claude;
@@ -58,6 +60,14 @@ dotnet publish ClaudeIPGuard.App\ClaudeIPGuard.App.csproj -c Release -r win-x64 
 ```
 
 Приложение требует права администратора, потому что управляет правилами Windows Firewall.
+
+### Releases
+
+Если вы просто хотите пользоваться приложением, не собирайте проект вручную. Откройте GitHub Releases и скачайте архив:
+
+`ClaudeIPGuard-1.0.1-win-x64.zip`
+
+Распакуйте архив в любую папку и запустите `ClaudeIPGuard.App.exe`. Windows попросит права администратора, потому что приложению нужно управлять firewall-правилами.
 
 ## English
 
@@ -81,6 +91,8 @@ Features:
 - keeps local logs and exports diagnostic reports;
 - runs from the tray and can start with Windows.
 
+The window can be minimized with the normal minimize button. The `X` button does not stop protection: it hides the window to the tray and the guard keeps running. To fully close Claude IP Guard, use tray menu -> `Exit`.
+
 What it does not do:
 
 - does not inspect Claude traffic;
@@ -101,6 +113,14 @@ dotnet publish ClaudeIPGuard.App\ClaudeIPGuard.App.csproj -c Release -r win-x64 
 ```
 
 The app requires administrator rights because it manages Windows Firewall rules.
+
+### Releases
+
+If you only want to use the app, do not build it manually. Open GitHub Releases and download:
+
+`ClaudeIPGuard-1.0.1-win-x64.zip`
+
+Unzip it anywhere and run `ClaudeIPGuard.App.exe`. Windows will ask for administrator rights because the app needs to manage firewall rules.
 
 ## License
 
