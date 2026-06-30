@@ -1,0 +1,45 @@
+# Build outputs
+bin/
+obj/
+**/bin/
+**/obj/
+deploy/
+artifacts/
+
+# IDE and local tooling
+.vs/
+.vscode/
+.idea/
+.agents/
+.codex/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Local runtime data
+logs/
+diagnostics/
+*.log
+*.tmp
+*.cache
+
+# Test and coverage output
+TestResults/
+coverage/
+*.trx
+*.coverage
+*.coveragexml
+
+# Packages and generated publish archives
+*.nupkg
+*.snupkg
+*.zip
+*.7z
+*.msix
+*.appx
+
+# OS noise
+Thumbs.db
+Desktop.ini
+.DS_Store

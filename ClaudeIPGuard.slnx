@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="ClaudeIPGuard.App/ClaudeIPGuard.App.csproj" />
+  <Project Path="ClaudeIPGuard.Core/ClaudeIPGuard.Core.csproj" />
+  <Project Path="ClaudeIPGuard.Tests/ClaudeIPGuard.Tests.csproj" />
+</Solution>
