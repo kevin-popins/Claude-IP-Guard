@@ -18,11 +18,11 @@
 
 ## Русский
 
-Claude IP Guard нужен для простой вещи: не дать Claude Desktop выйти в сеть, если текущий публичный IP выглядит опасно или непонятно.
+Claude IP Guard нужен для простой вещи: не дать Claude Desktop выйти в сеть, если текущий ip относится к стране в которой запрещено использование claude либо пользователь сам указал ip с которого он не хочет выходить к серверам claude.
 
 Приложение постоянно живет рядом с Claude, проверяет внешний IP, страну, состояние процессов Claude и правила Windows Firewall. Если сеть поменялась, проверка сломалась, провайдеры IP спорят между собой или страна попала в блок, Claude сначала блокируется. Разрешение включается только после успешной проверки.
 
-По умолчанию заблокированы страны: `RU`, `BY`, `IR`, `KP`. Strict Mode включен: если Claude уже запущен и подтвержден опасный IP, приложение может завершить Claude-процессы после блокировки сети.
+По умолчанию заблокированы страны: `RU`, `BY`, `IR`, `KP`. Код страны которую вы хотите запретить настраивается в settings, так же можно указать конкретные ip. Strict Mode включен: если Claude уже запущен и подтвержден опасный IP, приложение может завершить Claude-процессы после блокировки сети.
 
 Что умеет:
 
@@ -47,7 +47,7 @@ Claude IP Guard нужен для простой вещи: не дать Claude 
 - не читает содержимое чатов;
 - не отправляет ваши данные куда-либо, кроме обычных публичных IP-check запросов.
 
-Главное правило: если что-то непонятно, Claude блокируется.
+Главное правило: если что-то не так с сетью, Claude блокируется.
 
 ### Сборка
 
@@ -71,11 +71,11 @@ dotnet publish ClaudeIPGuard.App\ClaudeIPGuard.App.csproj -c Release -r win-x64 
 
 ## English
 
-Claude IP Guard does one practical job: it keeps Claude Desktop offline when the current public IP is unsafe or unclear.
+Claude IP Guard does one practical job: it keeps Claude Desktop offline if the current IP belongs to a country where the use of Claude is prohibited, or if the user has specified an IP from which they do not wish to connect to Claude's servers.
 
 The app watches your public IP, country, Claude processes, and Windows Firewall state. If the network changes, the IP check fails, providers disagree, or the country is blocked, Claude is blocked first. Network access is allowed only after a successful safe check.
 
-Default blocked countries are `RU`, `BY`, `IR`, `KP`. Strict Mode is enabled by default: if Claude is already running and a dangerous IP is confirmed, the app can terminate Claude-related processes after blocking network access.
+Default blocked countries are `RU`, `BY`, `IR`, `KP`. The country code you wish to block is configured in the settings; you can also specify particular IP addresses. Strict Mode is enabled by default: if Claude is already running and a dangerous IP is confirmed, the app can terminate Claude-related processes after blocking network access.
 
 Features:
 
