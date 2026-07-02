@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 1.0.1" src="https://img.shields.io/badge/version-1.0.1-brightgreen?style=for-the-badge">
+  <img alt="Version 1.0.2" src="https://img.shields.io/badge/version-1.0.2-brightgreen?style=for-the-badge">
   <img alt="Windows" src="https://img.shields.io/badge/Windows-WPF-0078D4?style=for-the-badge&logo=windows">
   <img alt=".NET 8" src="https://img.shields.io/badge/.NET-8.0-512BD4?style=for-the-badge&logo=dotnet">
   <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge">
@@ -18,11 +18,11 @@
 
 ## Русский
 
-Claude IP Guard нужен для простой вещи: не дать Claude Desktop выйти в сеть, если текущий ip относится к стране в которой запрещено использование claude либо пользователь сам указал ip с которого он не хочет выходить к серверам claude.
+Claude IP Guard нужен для простой вещи: не дать Claude Desktop выйти в сеть, если текущий IP относится к стране, в которой запрещено использование Claude, либо если пользователь сам указал IP или диапазон IP, с которого он не хочет выходить к серверам Claude.
 
 Приложение постоянно живет рядом с Claude, проверяет внешний IP, страну, состояние процессов Claude и правила Windows Firewall. Если сеть поменялась, проверка сломалась, провайдеры IP спорят между собой или страна попала в блок, Claude сначала блокируется. Разрешение включается только после успешной проверки.
 
-По умолчанию заблокированы страны: `RU`, `BY`, `IR`, `KP`. Код страны которую вы хотите запретить настраивается в settings, так же можно указать конкретные ip. Strict Mode включен: если Claude уже запущен и подтвержден опасный IP, приложение может завершить Claude-процессы после блокировки сети.
+По умолчанию заблокированы страны: `RU`, `BY`, `IR`, `KP`. Коды стран, которые нужно запретить, настраиваются в `Settings`. Там же можно указать конкретные IP или CIDR-диапазоны для режима IP allowlist. Strict Mode включен: если Claude уже запущен и подтвержден опасный IP, приложение может завершить Claude-процессы после блокировки сети.
 
 Что умеет:
 
@@ -38,7 +38,7 @@ Claude IP Guard нужен для простой вещи: не дать Claude 
 - пишет локальные логи и экспортирует диагностический отчет;
 - работает из tray и может запускаться вместе с Windows.
 
-Окно можно свернуть обычной кнопкой minimize. Кнопка `X` не выключает защиту: она прячет окно в tray, а приложение продолжает следить за сетью. Полностью закрыть Claude IP Guard можно только через tray menu -> `Exit`.
+Окно можно свернуть обычной кнопкой minimize. Кнопка `X` не выключает защиту: она прячет окно в tray, а приложение продолжает следить за сетью. Полностью закрыть Claude IP Guard можно только через tray menu -> `Exit`; при таком выходе приложение снимает свои firewall-ограничения для Claude.
 
 Чего приложение не делает:
 
@@ -65,17 +65,17 @@ dotnet publish ClaudeIPGuard.App\ClaudeIPGuard.App.csproj -c Release -r win-x64 
 
 Если вы просто хотите пользоваться приложением, не собирайте проект вручную. Откройте GitHub Releases и скачайте архив:
 
-`ClaudeIPGuard-1.0.1-win-x64.zip`
+`ClaudeIPGuard-1.0.2-win-x64.zip`
 
-Распакуйте архив в любую папку и запустите `ClaudeIPGuard.App.exe`. Windows попросит права администратора, потому что приложению нужно управлять firewall-правилами.
+В архиве уже есть папка приложения. Распакуйте архив в удобное место и запустите `ClaudeIPGuard.App.exe`. Windows попросит права администратора, потому что приложению нужно управлять firewall-правилами.
 
 ## English
 
-Claude IP Guard does one practical job: it keeps Claude Desktop offline if the current IP belongs to a country where the use of Claude is prohibited, or if the user has specified an IP from which they do not wish to connect to Claude's servers.
+Claude IP Guard does one practical job: it keeps Claude Desktop offline when the current IP belongs to a country where Claude usage is not allowed, or when the user has explicitly configured an IP or IP range they do not want to use for Claude server access.
 
 The app watches your public IP, country, Claude processes, and Windows Firewall state. If the network changes, the IP check fails, providers disagree, or the country is blocked, Claude is blocked first. Network access is allowed only after a successful safe check.
 
-Default blocked countries are `RU`, `BY`, `IR`, `KP`. The country code you wish to block is configured in the settings; you can also specify particular IP addresses. Strict Mode is enabled by default: if Claude is already running and a dangerous IP is confirmed, the app can terminate Claude-related processes after blocking network access.
+Default blocked countries are `RU`, `BY`, `IR`, `KP`. Country codes can be changed in `Settings`. You can also configure specific IPs or CIDR ranges for IP allowlist mode. Strict Mode is enabled by default: if Claude is already running and a dangerous IP is confirmed, the app can terminate Claude-related processes after blocking network access.
 
 Features:
 
@@ -91,7 +91,7 @@ Features:
 - keeps local logs and exports diagnostic reports;
 - runs from the tray and can start with Windows.
 
-The window can be minimized with the normal minimize button. The `X` button does not stop protection: it hides the window to the tray and the guard keeps running. To fully close Claude IP Guard, use tray menu -> `Exit`.
+The window can be minimized with the normal minimize button. The `X` button does not stop protection: it hides the window to the tray and the guard keeps running. To fully close Claude IP Guard, use tray menu -> `Exit`; on exit, the app removes its own firewall restrictions for Claude.
 
 What it does not do:
 
@@ -118,9 +118,9 @@ The app requires administrator rights because it manages Windows Firewall rules.
 
 If you only want to use the app, do not build it manually. Open GitHub Releases and download:
 
-`ClaudeIPGuard-1.0.1-win-x64.zip`
+`ClaudeIPGuard-1.0.2-win-x64.zip`
 
-Unzip it anywhere and run `ClaudeIPGuard.App.exe`. Windows will ask for administrator rights because the app needs to manage firewall rules.
+The archive already contains the app folder. Unzip it anywhere and run `ClaudeIPGuard.App.exe`. Windows will ask for administrator rights because the app needs to manage firewall rules.
 
 ## License
 

@@ -629,6 +629,8 @@ public sealed class PublicIpService
 
 public sealed class FirewallService
 {
+    private const string OwnRulePrefix = "ClaudeIPGuard_Block_ClaudeDesktop";
+    private const string OwnRuleNamePattern = $"{OwnRulePrefix}*";
     private readonly LogService _log;
     private FirewallSnapshot _last = new(FirewallRuleStatus.Unknown, FirewallAccessStatus.Unknown, "none", null, DateTimeOffset.Now);
     private string _lastEnabledPathKey = "";
@@ -659,8 +661,7 @@ public sealed class FirewallService
             for (var i = 0; i < paths.Count; i++)
             {
                 var name = i == 0 ? "ClaudeIPGuard_Block_ClaudeDesktop_Main" : $"ClaudeIPGuard_Block_ClaudeDesktop_Helper_{i}";
-                var args = $"advfirewall firewall add rule name={name} dir=out action=block program=\"{paths[i]}\" enable=yes profile=any";
-                await RunNetshAsync(args);
+                await CreateBlockRuleAsync(name, paths[i]);
             }
 
             _last = new FirewallSnapshot(FirewallRuleStatus.RuleActive, FirewallAccessStatus.Blocked, "enable block", null, DateTimeOffset.Now);
@@ -707,104 +708,169 @@ public sealed class FirewallService
         }
     }
 
+    public async Task<FirewallSnapshot> RemoveBlockOnExitAsync()
+    {
+        try
+        {
+            await DeleteOwnRulesAsync();
+            _lastEnabledPathKey = "";
+            _last = await VerifyAsync();
+            if (_last.RuleStatus == FirewallRuleStatus.RuleActive)
+            {
+                _last = new FirewallSnapshot(FirewallRuleStatus.Error, FirewallAccessStatus.Unknown, "remove block on exit", "Claude IP Guard firewall rules are still active after exit cleanup.", DateTimeOffset.Now);
+                _log.Error(_last.LastError ?? "Claude IP Guard firewall rules are still active after exit cleanup.");
+                return _last;
+            }
+
+            _last = _last with { LastOperation = "remove block on exit" };
+            _log.Info("Firewall block removed on application exit.");
+            return _last;
+        }
+        catch (Exception ex)
+        {
+            _last = new FirewallSnapshot(FirewallRuleStatus.Error, FirewallAccessStatus.Unknown, "remove block on exit", ex.Message, DateTimeOffset.Now);
+            _log.Error($"Firewall exit cleanup failed: {ex.Message}");
+            return _last;
+        }
+    }
+
     public async Task<FirewallSnapshot> VerifyAsync()
     {
-        var sawInactiveOwnRule = false;
-        foreach (var name in OwnRuleNames())
+        var checkedAt = DateTimeOffset.Now;
+        var result = await RunPowerShellResultAsync($$"""
+            $ErrorActionPreference = 'Stop'
+            $ProgressPreference = 'SilentlyContinue'
+            $rules = Get-NetFirewallRule -Name '{{OwnRuleNamePattern}}' -ErrorAction SilentlyContinue
+            $rules | ForEach-Object { "$($_.Name)`t$($_.Enabled)`t$($_.Direction)`t$($_.Action)" }
+            """);
+        if (result.ExitCode != 0)
         {
-            var result = await RunNetshResultAsync($"advfirewall firewall show rule name={name}");
-            var combined = $"{result.Output}{Environment.NewLine}{result.Error}";
-            if (result.ExitCode != 0 && FirewallStateModel.IsRuleMissingOutput(combined))
+            var message = string.IsNullOrWhiteSpace(result.Error) ? result.Output : result.Error;
+            _log.Error($"Firewall verify failed: {message}");
+            if (_last.RuleStatus == FirewallRuleStatus.RuleActive
+                && _last.AccessStatus == FirewallAccessStatus.Blocked)
             {
-                continue;
+                _log.Warn("Firewall verify failed; keeping last known blocked firewall state.");
+                return _last with
+                {
+                    LastOperation = "verify fallback: last known blocked",
+                    LastError = message,
+                    CheckedAt = checkedAt
+                };
             }
 
-            if (result.ExitCode != 0)
-            {
-                _last = new FirewallSnapshot(FirewallRuleStatus.Error, FirewallAccessStatus.Unknown, "verify", string.IsNullOrWhiteSpace(result.Error) ? result.Output : result.Error, DateTimeOffset.Now);
-                return _last;
-            }
-
-            var parsedRule = FirewallStateModel.ParseNetshShowRule(result.ExitCode, result.Output, result.Error, DateTimeOffset.Now);
-            if (parsedRule.RuleStatus is FirewallRuleStatus.RuleActive or FirewallRuleStatus.Error)
-            {
-                _last = parsedRule;
-                return _last;
-            }
-
-            sawInactiveOwnRule = true;
-        }
-
-        var parsed = new FirewallSnapshot(FirewallRuleStatus.RuleInactive, FirewallAccessStatus.Allowed, "verify", null, DateTimeOffset.Now);
-        if (!sawInactiveOwnRule
-            && parsed.RuleStatus == FirewallRuleStatus.RuleInactive
-            && _last.RuleStatus == FirewallRuleStatus.Error
-            && (_last.LastOperation.Contains("enable block", StringComparison.OrdinalIgnoreCase)
-                || _last.LastOperation.Contains("failed block", StringComparison.OrdinalIgnoreCase)))
-        {
-            _last = _last with
-            {
-                LastOperation = "verify after failed block",
-                LastError = _last.LastError ?? "Firewall block was requested but no active rule exists.",
-                CheckedAt = DateTimeOffset.Now
-            };
+            _last = new FirewallSnapshot(FirewallRuleStatus.Error, FirewallAccessStatus.Unknown, "verify", message, checkedAt);
             return _last;
         }
 
+        var rules = ParsePowerShellFirewallRules(result.Output);
+        var parsed = EvaluateOwnRules(rules, checkedAt);
         _last = parsed;
         return _last;
     }
 
-    private static async Task<string> RunNetshAsync(string args)
+    private static FirewallSnapshot EvaluateOwnRules(IReadOnlyList<PowerShellFirewallRule> rules, DateTimeOffset checkedAt)
     {
-        var result = await RunNetshResultAsync(args);
-        if (result.ExitCode != 0)
+        if (rules.Count == 0)
         {
-            throw new InvalidOperationException(string.IsNullOrWhiteSpace(result.Error) ? result.Output : result.Error);
+            return new FirewallSnapshot(FirewallRuleStatus.RuleInactive, FirewallAccessStatus.Allowed, "verify", null, checkedAt);
         }
 
-        return result.Output;
+        var enabled = rules.Where(rule => string.Equals(rule.Enabled, "True", StringComparison.OrdinalIgnoreCase)).ToList();
+        if (enabled.Count == 0)
+        {
+            return new FirewallSnapshot(FirewallRuleStatus.RuleInactive, FirewallAccessStatus.Allowed, "verify", null, checkedAt);
+        }
+
+        var anyActiveBlock = enabled.Any(rule =>
+            string.Equals(rule.Direction, "Outbound", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(rule.Action, "Block", StringComparison.OrdinalIgnoreCase));
+        if (anyActiveBlock)
+        {
+            return new FirewallSnapshot(FirewallRuleStatus.RuleActive, FirewallAccessStatus.Blocked, "verify", null, checkedAt);
+        }
+
+        return new FirewallSnapshot(
+            FirewallRuleStatus.Error,
+            FirewallAccessStatus.Unknown,
+            "verify",
+            "Claude IP Guard firewall rule exists but its direction/action is unexpected.",
+            checkedAt);
     }
 
-    private static async Task<(int ExitCode, string Output, string Error)> RunNetshResultAsync(string args)
+    private static IReadOnlyList<PowerShellFirewallRule> ParsePowerShellFirewallRules(string output)
     {
-        using var process = Process.Start(new ProcessStartInfo
+        if (string.IsNullOrWhiteSpace(output))
         {
-            FileName = "netsh",
-            Arguments = args,
-            CreateNoWindow = true,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        }) ?? throw new InvalidOperationException("Unable to start netsh.");
+            return [];
+        }
 
-        var output = await process.StandardOutput.ReadToEndAsync();
-        var error = await process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-        return (process.ExitCode, output, error);
+        return output
+            .Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(line => line.Split('\t'))
+            .Where(parts => parts.Length == 4)
+            .Select(parts => new PowerShellFirewallRule(parts[0], parts[1], parts[2], parts[3]))
+            .ToList();
     }
 
     private static async Task DeleteOwnRulesAsync()
     {
-        foreach (var name in OwnRuleNames())
+        var result = await RunPowerShellResultAsync($"""
+            $ErrorActionPreference = 'Stop'
+            $ProgressPreference = 'SilentlyContinue'
+            Get-NetFirewallRule -Name '{OwnRuleNamePattern}' -ErrorAction SilentlyContinue |
+                Remove-NetFirewallRule -ErrorAction Stop
+            """);
+        if (result.ExitCode != 0)
         {
-            var result = await RunNetshResultAsync($"advfirewall firewall delete rule name={name}");
-            var combined = $"{result.Output}{Environment.NewLine}{result.Error}";
-            if (result.ExitCode != 0 && FirewallStateModel.IsAccessDeniedOutput(combined))
-            {
-                throw new InvalidOperationException(string.IsNullOrWhiteSpace(result.Error) ? result.Output : result.Error);
-            }
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(result.Error) ? result.Output : result.Error);
         }
     }
 
-    private static IEnumerable<string> OwnRuleNames()
+    private static async Task CreateBlockRuleAsync(string name, string programPath)
     {
-        yield return "ClaudeIPGuard_Block_ClaudeDesktop_Main";
-        for (var i = 1; i <= 20; i++)
+        var script = $"""
+            $ErrorActionPreference = 'Stop'
+            $ProgressPreference = 'SilentlyContinue'
+            Remove-NetFirewallRule -Name {PowerShellString(name)} -ErrorAction SilentlyContinue
+            New-NetFirewallRule `
+                -Name {PowerShellString(name)} `
+                -DisplayName {PowerShellString(name)} `
+                -Direction Outbound `
+                -Action Block `
+                -Program {PowerShellString(programPath)} `
+                -Profile Any `
+                -Enabled True | Out-Null
+            """;
+        var result = await RunPowerShellResultAsync(script);
+        if (result.ExitCode != 0)
         {
-            yield return $"ClaudeIPGuard_Block_ClaudeDesktop_Helper_{i}";
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(result.Error) ? result.Output : result.Error);
         }
     }
+
+    private static async Task<(int ExitCode, string Output, string Error)> RunPowerShellResultAsync(string script)
+    {
+        var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = "powershell.exe",
+            Arguments = $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encoded}",
+            CreateNoWindow = true,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        }) ?? throw new InvalidOperationException("Unable to start PowerShell.");
+
+        var output = await process.StandardOutput.ReadToEndAsync();
+        var error = await process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        return (process.ExitCode, output.Trim(), error.Trim());
+    }
+
+    private static string PowerShellString(string value) => $"'{value.Replace("'", "''")}'";
+
+    private sealed record PowerShellFirewallRule(string Name, string Enabled, string Direction, string Action);
 }
 
 public sealed class ClaudeProcessService

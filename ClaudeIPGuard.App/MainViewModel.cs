@@ -181,7 +181,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             () => _ = RecheckAndUnblockAsync(),
             () => _showSettings(),
             OpenLogs,
-            _exitApplication);
+            () => _ = ExitApplicationAsync());
 
         NetworkChange.NetworkAddressChanged += OnNetworkChanged;
 
@@ -396,6 +396,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _log.Info($"Firewall test result: {before.RuleStatus}/{before.AccessStatus} {before.LastError}");
         await RefreshAsync(forceIpCheck: false, reason: "test firewall");
         ShowToast($"Firewall test complete: {before.RuleStatus}/{before.AccessStatus}.", before.AccessStatus == FirewallAccessStatus.Blocked ? ToastKind.Success : ToastKind.Warning);
+    }
+
+    private async Task ExitApplicationAsync()
+    {
+        ShowToast("Removing Claude firewall rules before exit...", ToastKind.Info, autoDismiss: false);
+        _log.Info("Application exit requested from tray. Removing Claude IP Guard firewall rules.");
+        await _firewall.RemoveBlockOnExitAsync();
+        await System.Windows.Application.Current.Dispatcher.InvokeAsync(_exitApplication);
     }
 
     private void SaveSettings()
